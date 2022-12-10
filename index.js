@@ -7,6 +7,7 @@ import { six } from "./six/six.js";
 import { seven } from "./seven/seven.js";
 import { eight } from "./eight/eight.js";
 import { nine } from "./nine/nine.js";
+import { ten } from "./ten/ten.js";
 
 
-nine();
+ten();
