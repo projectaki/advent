@@ -9,5 +9,6 @@ import { eight } from "./eight/eight.js";
 import { nine } from "./nine/nine.js";
 import { ten } from "./ten/ten.js";
 import { eleven } from "./eleven/eleven.js";
+import { twelve } from "./twelve/twelve.js";
 
-eleven();
+twelve();
