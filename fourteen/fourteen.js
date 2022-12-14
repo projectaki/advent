@@ -6,21 +6,43 @@ export const fourteen = () => {
 
     const coords = input.map(l => l.split('->').map(s => s.trim()).map(s => s.split(',').map(x => +x)));
 
-    let maxX, maxY, minX, minY = 0;
+    let maxI;
 
     coords.forEach(row => {
         row.forEach(([x, y]) => {
-            if (maxX === undefined || x > maxX) maxX = x;
-            if (maxY === undefined || y > maxY) maxY = y;
-            if (minX === undefined || x < minX) minX = x;
+            if (maxI === undefined || y > maxI) maxI = y;
         });
     });
 
-    const width = maxX - minX + 1;
-    const height = maxY - minY + 1;
+    const width = 1000;
+    const height = maxI + 1;
 
-    console.log(width, height, minX, minY)
+    const grid = getGridWithLines(height, width, coords);
 
+    let counter1 = 0;
+
+    while(moveSandRec(grid, 0, 500, height - 1))
+    {
+        counter1++;
+    }
+    console.log(counter1);
+
+    // part two
+
+    let grid2 = getGridWithLines(height, width, coords);
+    
+    grid2 = grid2.concat([[...Array(width)].map(x => '.')]).concat([[...Array(width)].map(x => '#')]);
+
+    let counter2 = 0;
+
+    while(moveSandRec(grid2, 0, 500, null))
+    {
+        counter2++;
+    }
+    console.log(counter2);
+};
+
+const getGridWithLines = (height, width, coords) => {
     const grid = [...Array(height)].map(e => Array(width));
 
     for(let i = 0; i < height; i++) {
@@ -34,79 +56,55 @@ export const fourteen = () => {
             const first = row[i - 1];
             const second = row[i];
 
-            const xformedFirst = getGridCoords(first[0], first[1], minX);
-            const xformedSecond = getGridCoords(second[0], second[1], minX);
-
-            drawLine(grid,  xformedFirst[1], xformedFirst[0], xformedSecond[1], xformedSecond[0]);
+            drawLine(grid, first[1], first[0], second[1], second[0]);
         }
     });
 
-    let counter = 0;
-
-    while(moveSandRec(grid, 500, 0, minX, width, height))
-    {
-        counter++;
-    }
-
-    grid.forEach(r => console.log(r.join('')));
-    console.log(counter);
-
-};
-
-const getGridCoords = (x, y, minX) => {
-    return [x - minX, y];
+    return grid;
 }
 
-const drawLine = (grid, x1, y1, x2, y2) => {
-    if(x1 === x2) {
-        let smaller = y1 < y2 ? y1 : y2;
-        let larger = y1 < y2 ? y2 : y1;
+const drawLine = (grid, i1, j1, i2, j2) => {
+    if(i1 === i2) {
+        let smaller = j1 < j2 ? j1 : j2;
+        let larger = j1 < j2 ? j2 : j1;
 
         for(let i = smaller; i <= larger; i++) {
-            grid[x1][i] = '#';
+            grid[i1][i] = '#';
         }
     }
-    else if(y1 === y2) {
-        let smaller = x1 < x2 ? x1 : x2;
-        let larger = x1 < x2 ? x2 : x1;
+    else if(j1 === j2) {
+        let smaller = i1 < i2 ? i1 : i2;
+        let larger = i1 < i2 ? i2 : i1;
 
         for(let i = smaller; i <= larger; i++) {
-            grid[i][y1] = '#';
+            grid[i][j1] = '#';
         }
     }
 }
 
-const moveSandRec = (grid, x, y, minX, width, height) => {
-    const pos = getGridCoords(x, y, minX);
+const moveSandRec = (grid, i, j, cuck) => {
+    const [nextI, nextJ] = [i + 1, j];
 
-    const nextPos = [pos[0], pos[1] + 1];
-
-    if(nextPos[1] < 0 || nextPos[1] >= height || nextPos[0] < 0 || nextPos[0] >= width) {
+    if(i === cuck) {
         return false;
     }
 
-    if(grid[nextPos[1]][nextPos[0]] === '.') {
-        return moveSandRec(grid, x, y + 1, minX, width, height);
+    if(grid[nextI][nextJ] === '.') {
+        return moveSandRec(grid, i + 1, j, cuck);
     }
     else {
-        const leftPos = [pos[0] - 1, pos[1] + 1];
-        const rightPos = [pos[0] + 1, pos[1] + 1];
+        const leftPos = [nextI, nextJ - 1];
+        const rightPos = [nextI, nextJ + 1];
 
-        if(grid[leftPos[1]][leftPos[0]] === '.') {
-            return moveSandRec(grid, x - 1, y + 1, minX, width, height);
+        if(grid[leftPos[0]][leftPos[1]] === '.') {
+            return moveSandRec(grid, i + 1, j - 1, cuck);
         }
-        else if(grid[leftPos[1]][leftPos[0]] === undefined) {
-            return false;
-        }
-        else if(grid[rightPos[1]][rightPos[0]] === '.') {
-            return moveSandRec(grid, x + 1, y + 1, minX, width, height);
-        }
-        else if(grid[rightPos[1]][rightPos[0]] === undefined) {
-            return false;
+        else if(grid[rightPos[0]][rightPos[1]] === '.') {
+            return moveSandRec(grid, i + 1, j + 1, cuck);
         }
         else {
-            if(grid[pos[1]][pos[0]] === 'x') return false;
-            grid[pos[1]][pos[0]] = 'x';
+            if(grid[i][j] === 'x') return false;
+            grid[i][j] = 'x';
             
             return true;
         }
