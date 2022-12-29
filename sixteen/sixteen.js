@@ -92,34 +92,136 @@ export const sixteen = () => {
 
   //const res = rec(0,'AA', valveMap, isOpenMap, {});
 
-  const rec2 = (minutes, currentValve, valveMap, isOpenMap, dict, valved) => {
-    // shared minutes, shared valve, shared isOpenMap
+  const rec2 = (minutes, meValve, eleValve, valveMap, isOpenMap, dict) => {
+    const xkey = `${minutes}-${meValve}-${eleValve}-${JSON.stringify(
+      isOpenMap
+    )}`;
 
-    // each recursion has to be a minute, otherwise hard to sync person and elephant, every minute both have to do smth.
-
-    // for every room we have options:
-    // Either I open valve or elephant opens valve, or no one opens valve.
-
-    // For every tunnel 
-    // We check every tunnel and check the conditions
-
-    let tunnels = [1,2,3];
-
-    for(let t1 of tunnels) {
-        //option 1: I open the current valve, elephant moves to t1.
-        //option 2: Elephant opens the current valve, I move to t1.
-        //option 3: Neither of us opens the valve. In this case for every tunnel, elephant can move to a different tunnel.
-        for(let t2 of tunnels) {
-            // option3 still: I move to t1, elephant moves to t2.
-        }
+    if (dict[xkey]) {
+      return dict[xkey];
     }
 
-   
+    if (minutes === 26) {
+      return 0;
+    }
+
+    let localPressure = 0;
+
+    const keys = Object.keys(isOpenMap);
+
+    for (let k of keys) {
+      const val = isOpenMap[k];
+
+      if (val) {
+        const rate = valveMap.get(k)[0];
+
+        localPressure += rate;
+      }
+    }
+
+    if (Object.values(isOpenMap).every((x) => x)) {
+      const prev = rec2(
+        minutes + 1,
+        meValve,
+        eleValve,
+        valveMap,
+        isOpenMap,
+        dict
+      );
+
+      return prev + localPressure;
+    }
+
+    let max = 0;
+
+    const [meRate, tunnelsMe] = valveMap.get(meValve);
+    const [eleRate, tunnelsEle] = valveMap.get(eleValve);
+
+    const isMeOpen = isOpenMap[meValve];
+    const isEleOpen = isOpenMap[eleValve];
+
+    if (meValve !== eleValve && !isMeOpen && !isEleOpen && (meRate !== 0 && eleRate !== 0)) {
+      const isOpenMapWithOpenedValve = {
+        ...isOpenMap,
+        [meValve]: true,
+        [eleValve]: true,
+      };
+
+      const sum1 =
+        rec2(
+          minutes + 1,
+          meValve,
+          eleValve,
+          valveMap,
+          isOpenMapWithOpenedValve,
+          dict
+        ) + localPressure;
+
+      max = Math.max(max, sum1);
+    }
+
+    if (!isMeOpen && meRate !== 0) {
+      for (let tEle of tunnelsEle) {
+        const isOpenMapWithOpenedValve = { ...isOpenMap, [meValve]: true };
+
+        const sum1 =
+          rec2(
+            minutes + 1,
+            meValve,
+            tEle,
+            valveMap,
+            isOpenMapWithOpenedValve,
+            dict
+          ) + localPressure;
+
+        max = Math.max(max, sum1);
+      }
+    }
+
+    if (!isEleOpen && eleRate !== 0) {
+      for (let tMe of tunnelsMe) {
+        const isOpenMapWithOpenedValve = { ...isOpenMap, [eleValve]: true };
+        const sum2 =
+          rec2(
+            minutes + 1,
+            tMe,
+            eleValve,
+            valveMap,
+            isOpenMapWithOpenedValve,
+            dict
+          ) + localPressure;
+
+        max = Math.max(max, sum2);
+      }
+    }
+
+    for (let tMe of tunnelsMe) {
+      for (let tEle of tunnelsEle) {
+        const isOpenMapWithClosedValve = { ...isOpenMap };
+        const sum3 =
+          rec2(
+            minutes + 1,
+            tMe,
+            tEle,
+            valveMap,
+            isOpenMapWithClosedValve,
+            dict
+          ) + localPressure;
+
+        max = Math.max(max, sum3);
+      }
+    }
+
+    const key = `${minutes}-${meValve}-${eleValve}-${JSON.stringify(
+      isOpenMap
+    )}`;
+
+    dict[key] = max;
+
+    return max;
   };
 
-  //AA, [T1, T2, T3]
-
-  const res = rec2(0, "AA", valveMap, isOpenMap, {});
+  const res = rec2(0, "AA", "AA", valveMap, isOpenMap, {});
 
   console.log(res);
 };
