@@ -1,4 +1,5 @@
 import fs from "fs";
+import { addAbortSignal } from "stream";
 
 export const sixteen = () => {
   const data = fs.readFileSync("sixteen/16.txt", "utf8");
@@ -92,13 +93,28 @@ export const sixteen = () => {
 
   //const res = rec(0,'AA', valveMap, isOpenMap, {});
 
-  const rec2 = (minutes, meValve, eleValve, valveMap, isOpenMap, dict) => {
-    const xkey = `${minutes}-${meValve}-${eleValve}-${JSON.stringify(
-      isOpenMap
-    )}`;
+  const serialize = (isOpenMap) => {
+    let res = "";
+
+    for (let k of Object.keys(isOpenMap)) {
+      res += isOpenMap[k] ? "1" : "0";
+    }
+
+    return res;
+  };
+
+  const rec2 = (minutes, meValve, eleValve, valveMap, isOpenMap, dict = {}) => {
+    //console.log(minutes)
+    const ser = serialize(isOpenMap);
+    const xkey = `${minutes}-${meValve}-${eleValve}-${ser}`;
+    const xkey2 = `${minutes}-${eleValve}-${meValve}-${ser}`;
 
     if (dict[xkey]) {
       return dict[xkey];
+    }
+
+    if (dict[xkey2]) {
+      return dict[xkey2];
     }
 
     if (minutes === 26) {
@@ -119,7 +135,11 @@ export const sixteen = () => {
       }
     }
 
-    if (Object.values(isOpenMap).every((x) => x)) {
+    if (Object.entries(isOpenMap).filter(([key, val]) => {
+        const [rate, _] = valveMap.get(key);
+
+        return rate !== 0;
+    }).every(([key, val]) => val)) {
       const prev = rec2(
         minutes + 1,
         meValve,
@@ -129,7 +149,11 @@ export const sixteen = () => {
         dict
       );
 
-      return prev + localPressure;
+      const res = prev + localPressure;
+
+      dict[xkey] = res;
+
+      return res;
     }
 
     let max = 0;
@@ -140,39 +164,35 @@ export const sixteen = () => {
     const isMeOpen = isOpenMap[meValve];
     const isEleOpen = isOpenMap[eleValve];
 
-    if (meValve !== eleValve && !isMeOpen && !isEleOpen && (meRate !== 0 && eleRate !== 0)) {
-      const isOpenMapWithOpenedValve = {
-        ...isOpenMap,
-        [meValve]: true,
-        [eleValve]: true,
-      };
+    if (
+      meValve !== eleValve &&
+      !isMeOpen &&
+      !isEleOpen &&
+      meRate !== 0 &&
+      eleRate !== 0
+    ) {
+      isOpenMap[meValve] = true;
+      isOpenMap[eleValve] = true;
 
       const sum1 =
-        rec2(
-          minutes + 1,
-          meValve,
-          eleValve,
-          valveMap,
-          isOpenMapWithOpenedValve,
-          dict
-        ) + localPressure;
+        rec2(minutes + 1, meValve, eleValve, valveMap, isOpenMap, dict) +
+        localPressure;
+
+      isOpenMap[meValve] = false;
+      isOpenMap[eleValve] = false;
 
       max = Math.max(max, sum1);
     }
 
     if (!isMeOpen && meRate !== 0) {
       for (let tEle of tunnelsEle) {
-        const isOpenMapWithOpenedValve = { ...isOpenMap, [meValve]: true };
+        isOpenMap[meValve] = true;
 
         const sum1 =
-          rec2(
-            minutes + 1,
-            meValve,
-            tEle,
-            valveMap,
-            isOpenMapWithOpenedValve,
-            dict
-          ) + localPressure;
+          rec2(minutes + 1, meValve, tEle, valveMap, isOpenMap, dict) +
+          localPressure;
+
+        isOpenMap[meValve] = false;
 
         max = Math.max(max, sum1);
       }
@@ -180,48 +200,65 @@ export const sixteen = () => {
 
     if (!isEleOpen && eleRate !== 0) {
       for (let tMe of tunnelsMe) {
-        const isOpenMapWithOpenedValve = { ...isOpenMap, [eleValve]: true };
+        isOpenMap[eleValve] = true;
+
         const sum2 =
-          rec2(
-            minutes + 1,
-            tMe,
-            eleValve,
-            valveMap,
-            isOpenMapWithOpenedValve,
-            dict
-          ) + localPressure;
+          rec2(minutes + 1, tMe, eleValve, valveMap, isOpenMap, dict) +
+          localPressure;
+
+        isOpenMap[eleValve] = false;
 
         max = Math.max(max, sum2);
       }
     }
 
+    const temp = [];
+
     for (let tMe of tunnelsMe) {
       for (let tEle of tunnelsEle) {
-        const isOpenMapWithClosedValve = { ...isOpenMap };
-        const sum3 =
-          rec2(
-            minutes + 1,
-            tMe,
-            tEle,
-            valveMap,
-            isOpenMapWithClosedValve,
-            dict
-          ) + localPressure;
-
-        max = Math.max(max, sum3);
+        if(!temp.some(([tMe2, tEle2]) => (tMe2 === tMe && tEle2 === tEle) || (tMe2 === tEle && tEle2 === tMe))) {
+          temp.push([tMe, tEle]);
+        }
       }
     }
 
-    const key = `${minutes}-${meValve}-${eleValve}-${JSON.stringify(
-      isOpenMap
-    )}`;
+    //if (true) {
 
-    dict[key] = max;
+
+      for (let [tMe, tEle] of temp) {
+        const sum3 =
+          rec2(minutes + 1, tMe, tEle, valveMap, isOpenMap, dict) +
+          localPressure;
+
+        max = Math.max(max, sum3);
+      }
+    //} 
+    // else {
+    //   for (let tMe of tunnelsMe) {
+    //     for (let tEle of tunnelsEle) {
+    //       const sum3 =
+    //         rec2(minutes + 1, tMe, tEle, valveMap, isOpenMap, dict) +
+    //         localPressure;
+
+    //       max = Math.max(max, sum3);
+    //     }
+    //   }
+    // }
+    dict[xkey] = max;
 
     return max;
   };
 
-  const res = rec2(0, "AA", "AA", valveMap, isOpenMap, {});
+  const start = Date.now();
 
+  const res = rec2(0, "AA", "AA", valveMap, isOpenMap);
   console.log(res);
+  console.log(Date.now() - start + "ms");
 };
+
+// aa, bb , cc
+// aa, bb, cc
+
+// aaaa, aabb, aacc, bbaa, bbbb, bbcc, ccaa, ccbb, cccc
+
+// dd, ee, ff
